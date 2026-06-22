@@ -2545,13 +2545,10 @@
 
     <div class="sync-panel">
       <div>
-        <label for="classCodeInput">رمز الفصل (للمزامنة بين الأجهزة)</label>
-        <div class="sync-code-row" style="margin-top:6px">
-          <input class="sync-code-input" id="classCodeInput" type="text" placeholder="مثال: faseh-2025" maxlength="40">
-          <button class="sync-code-btn" type="button" onclick="saveClassCode()">حفظ الرمز</button>
-        </div>
+        <div style="font-weight:800;color:var(--text-primary);margin-bottom:4px">☁️ بيانات مشتركة للجميع</div>
+        <div style="font-size:0.82rem;color:var(--text-muted)">أي تعديل من اللابتوب أو الموبايل يظهر لكل من يفتح الموقع</div>
       </div>
-      <div id="syncStatus">💾 محفوظ على هذا الجهاز</div>
+      <div id="syncStatus">⏳ جاري الاتصال...</div>
     </div>
 
     <!-- Add form -->
@@ -2773,16 +2770,18 @@ function rosterDel(id) { ROSTER = ROSTER.filter(x=>x.id!==id); scheduleSave(); }
 const ROSTER_AVATARS = ['🧒','👦','👧','🧑','👩','🧕','🧑‍🎓','🌟','🏅','🦁','🦅'];
 
 // ═══════════════════════════════════════════════════════════
-//  DATA PERSISTENCE (local + optional Supabase)
+//  DATA PERSISTENCE (shared cloud + local cache)
 // ═══════════════════════════════════════════════════════════
 const LS_DATA_KEY = 'seerah_saved_data';
-const LS_CLASS_KEY = 'seerah_class_code';
-let classCode = localStorage.getItem(LS_CLASS_KEY) || 'default';
+const SHARED_CLASS_CODE = 'global';
 let saveTimer = null;
+let syncPollTimer = null;
+let lastAppliedUpdatedAt = 0;
+let isSaving = false;
 
 function hasCloudSync() {
-  const c = window.SEERAH_CONFIG;
-  return !!(c && c.supabaseUrl && c.supabaseAnonKey);
+  const c = window.SEERAH_CONFIG || {};
+  return !!((c.apiUrl) || (c.supabaseUrl && c.supabaseAnonKey));
 }
 
 function getAppState() {
@@ -2792,20 +2791,35 @@ function getAppState() {
     keysCollected,
     completedStations: [...completedStations],
     isDark,
-    drawNames
+    drawNames,
+    updatedAt: Date.now()
   };
 }
 
-function applyAppState(state) {
-  if (!state || typeof state !== 'object') return;
+function applyAppState(state, options = {}) {
+  if (!state || typeof state !== 'object') return false;
   if (Array.isArray(state.roster)) ROSTER = state.roster;
   if (typeof state.rosterNextId === 'number') rosterNextId = state.rosterNextId;
   keysCollected = state.keysCollected || 0;
   completedStations = new Set(Array.isArray(state.completedStations) ? state.completedStations : []);
   if (typeof state.isDark === 'boolean') isDark = state.isDark;
   if (Array.isArray(state.drawNames)) drawNames = state.drawNames;
+  if (typeof state.updatedAt === 'number') lastAppliedUpdatedAt = state.updatedAt;
   updateKeys();
   applyThemeFromState();
+  if (options.refreshUi !== false) refreshAllUi();
+  return true;
+}
+
+function refreshAllUi() {
+  renderStudents();
+  renderHof();
+  if (document.getElementById('manageList')) renderManage();
+  if (document.getElementById('screen-draw')?.classList.contains('active')) {
+    renderDrawNames();
+    drawWheel();
+  }
+  if (document.getElementById('screen-map')?.classList.contains('active')) buildStations();
 }
 
 function applyThemeFromState() {
@@ -2839,10 +2853,29 @@ function loadLocal() {
   } catch { return null; }
 }
 
-async function loadFromSupabase(code) {
+async function loadFromApi() {
+  const { apiUrl } = window.SEERAH_CONFIG || {};
+  const res = await fetch(`${apiUrl}?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function saveToApi(state) {
+  const { apiUrl } = window.SEERAH_CONFIG || {};
+  const res = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const result = await res.json();
+  if (typeof result.updatedAt === 'number') lastAppliedUpdatedAt = result.updatedAt;
+}
+
+async function loadFromSupabase() {
   const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/seerah_classrooms?code=eq.${encodeURIComponent(code)}&select=data`,
+    `${supabaseUrl}/rest/v1/seerah_classrooms?code=eq.${encodeURIComponent(SHARED_CLASS_CODE)}&select=data`,
     { headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` } }
   );
   if (!res.ok) throw new Error(await res.text());
@@ -2850,8 +2883,9 @@ async function loadFromSupabase(code) {
   return rows[0]?.data ?? null;
 }
 
-async function saveToSupabase(code, state) {
+async function saveToSupabase(state) {
   const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
+  const payload = { ...state, updatedAt: Date.now() };
   const res = await fetch(`${supabaseUrl}/rest/v1/seerah_classrooms`, {
     method: 'POST',
     headers: {
@@ -2860,25 +2894,42 @@ async function saveToSupabase(code, state) {
       Authorization: `Bearer ${supabaseAnonKey}`,
       Prefer: 'resolution=merge-duplicates'
     },
-    body: JSON.stringify({ code, data: state, updated_at: new Date().toISOString() })
+    body: JSON.stringify({ code: SHARED_CLASS_CODE, data: payload, updated_at: new Date().toISOString() })
   });
   if (!res.ok) throw new Error(await res.text());
+  lastAppliedUpdatedAt = payload.updatedAt;
+}
+
+async function loadFromCloud() {
+  const c = window.SEERAH_CONFIG || {};
+  if (c.apiUrl) return loadFromApi();
+  if (c.supabaseUrl && c.supabaseAnonKey) return loadFromSupabase();
+  return null;
+}
+
+async function saveToCloud(state) {
+  const c = window.SEERAH_CONFIG || {};
+  if (c.apiUrl) return saveToApi(state);
+  if (c.supabaseUrl && c.supabaseAnonKey) return saveToSupabase(state);
 }
 
 async function persistData() {
   const state = getAppState();
   saveLocal(state);
   if (!hasCloudSync()) {
-    updateSyncStatus('💾 محفوظ على هذا الجهاز');
+    updateSyncStatus('⚠️ المزامنة غير مفعّلة');
     return;
   }
   updateSyncStatus('⏳ جاري الحفظ...');
+  isSaving = true;
   try {
-    await saveToSupabase(classCode, state);
-    updateSyncStatus('☁️ محفوظ في السحابة');
+    await saveToCloud(state);
+    updateSyncStatus('☁️ محفوظ للجميع');
   } catch (e) {
     console.error(e);
-    updateSyncStatus('⚠️ محفوظ محلياً فقط');
+    updateSyncStatus('⚠️ تعذّر الحفظ السحابي');
+  } finally {
+    isSaving = false;
   }
 }
 
@@ -2888,17 +2939,14 @@ function scheduleSave() {
 }
 
 async function loadAllData() {
-  const input = document.getElementById('classCodeInput');
-  if (input) input.value = classCode;
-
   if (hasCloudSync()) {
     updateSyncStatus('⏳ جاري التحميل...');
     try {
-      const cloud = await loadFromSupabase(classCode);
+      const cloud = await loadFromCloud();
       if (cloud) {
         applyAppState(cloud);
         saveLocal(cloud);
-        updateSyncStatus('☁️ تم التحميل من السحابة');
+        updateSyncStatus('☁️ متصل — البيانات مشتركة');
         return;
       }
     } catch (e) {
@@ -2907,20 +2955,27 @@ async function loadAllData() {
   }
 
   applyAppState(loadLocal());
-  updateSyncStatus('💾 محفوظ على هذا الجهاز');
+  updateSyncStatus(hasCloudSync() ? '⚠️ تعذّر التحميل من السحابة' : '⚠️ المزامنة غير مفعّلة');
 }
 
-function saveClassCode() {
-  const input = document.getElementById('classCodeInput');
-  const code = (input?.value || '').trim() || 'default';
-  classCode = code;
-  localStorage.setItem(LS_CLASS_KEY, code);
-  loadAllData().then(() => {
-    renderStudents();
-    renderHof();
-    renderManage();
-    if (document.getElementById('screen-map').classList.contains('active')) buildStations();
-  });
+async function pollCloudUpdates() {
+  if (!hasCloudSync() || isSaving) return;
+  try {
+    const cloud = await loadFromCloud();
+    if (!cloud || typeof cloud.updatedAt !== 'number') return;
+    if (cloud.updatedAt <= lastAppliedUpdatedAt) return;
+    applyAppState(cloud);
+    saveLocal(cloud);
+    updateSyncStatus('☁️ تم تحديث البيانات');
+  } catch (e) {
+    console.warn('Cloud poll failed', e);
+  }
+}
+
+function startCloudPolling() {
+  if (syncPollTimer) clearInterval(syncPollTimer);
+  if (!hasCloudSync()) return;
+  syncPollTimer = setInterval(pollCloudUpdates, 8000);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4044,6 +4099,7 @@ async function initApp() {
   await loadAllData();
   buildStars();
   renderStudents();
+  startCloudPolling();
 }
 
 initApp();
