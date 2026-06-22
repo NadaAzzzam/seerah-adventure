@@ -13,12 +13,19 @@
       "stars": 1,
       "photoData": null,
       "avatar": "👧"
+    },
+    {
+      "id": 3,
+      "name": "dfsdf",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "👦"
     }
   ],
-  "rosterNextId": 3,
+  "rosterNextId": 4,
   "keysCollected": 0,
   "completedStations": [],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782170089609
+  "updatedAt": 1782170096284
 }
