@@ -1,9 +1,17 @@
 {
-  "roster": [],
-  "rosterNextId": 1,
+  "roster": [
+    {
+      "id": 1,
+      "name": "xfgfg",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "🦁"
+    }
+  ],
+  "rosterNextId": 2,
   "keysCollected": 0,
   "completedStations": [],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 0
+  "updatedAt": 1782168124285
 }
