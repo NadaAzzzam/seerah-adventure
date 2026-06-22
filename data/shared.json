@@ -1,0 +1,17 @@
+{
+  "roster": [
+    {
+      "avatar": "??",
+      "name": "Test",
+      "id": 1,
+      "stars": 3,
+      "photoData": null
+    }
+  ],
+  "rosterNextId": 2,
+  "keysCollected": 0,
+  "completedStations": [],
+  "isDark": true,
+  "drawNames": [],
+  "updatedAt": 1782167922692
+}
