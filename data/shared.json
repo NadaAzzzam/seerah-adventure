@@ -1,6 +1,14 @@
 {
-  "roster": [],
-  "rosterNextId": 3,
+  "roster": [
+    {
+      "id": 3,
+      "name": "k",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "👧"
+    }
+  ],
+  "rosterNextId": 4,
   "keysCollected": 5,
   "completedStations": [
     0,
@@ -10,9 +18,6 @@
     4
   ],
   "isDark": true,
-  "drawNames": [
-    "jk]",
-    ","
-  ],
-  "updatedAt": 1782172217414
+  "drawNames": [],
+  "updatedAt": 1782172285717
 }
