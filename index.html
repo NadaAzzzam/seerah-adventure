@@ -2211,6 +2211,44 @@
   }
   .manage-photo-label:hover { background:rgba(139,92,246,0.22); }
   html.light .manage-photo-label { color:#5B21B6; }
+
+  /* ── Hover-to-upload overlay on existing student photos ── */
+  .photo-upload-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+  .photo-upload-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(8, 4, 24, 0.75);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    z-index: 3;
+    backdrop-filter: blur(2px);
+  }
+  .photo-upload-wrap:hover .photo-upload-overlay { opacity: 1; }
+  .puo-icon { font-size: 1.05rem; line-height: 1; pointer-events: none; }
+  .puo-text {
+    font-size: 0.58rem;
+    color: #fff;
+    font-family: Cairo, sans-serif;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .hof-rest-photo { position: relative; }
+
   .manage-stars-row { display:flex; gap:4px; align-items:center; background:var(--bg-card); border:2px solid var(--border-gold); border-radius:14px; padding:7px 12px; }
   .manage-star-btn { font-size:1.4rem; cursor:pointer; opacity:0.3; border:none; background:none; padding:2px; transition:opacity 0.15s,transform 0.15s; }
   .manage-star-btn.active { opacity:1; transform:scale(1.15); }
@@ -3579,7 +3617,10 @@ function renderStudents() {
 
     row.innerHTML=`
       <div class="student-rank ${rankClass}">${rankIcon}</div>
-      <div class="student-avatar" style="background:${grad}">${photoEl}</div>
+      <div class="student-avatar photo-upload-wrap" style="background:${grad}" onclick="triggerPhotoUpload(${st.id})" title="انقر لتغيير الصورة">
+        ${photoEl}
+        <div class="photo-upload-overlay"><span class="puo-icon">📷</span><span class="puo-text">تغيير</span></div>
+      </div>
       <div class="student-info">
         <div class="student-name">${st.name}</div>
         <div class="student-title" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -3684,7 +3725,10 @@ function renderHof() {
         ${isWinner?'<div class="podium-spotlight"></div>':''}
         <div class="podium-card">
           <div class="podium-photo-ring" style="position:relative">
-            <div class="podium-photo-inner">${buildPhoto(st,as[rank])}</div>
+            <div class="photo-upload-wrap" onclick="triggerPhotoUpload(${st.id})" title="انقر لتغيير الصورة">
+              <div class="podium-photo-inner">${buildPhoto(st,as[rank])}</div>
+              <div class="photo-upload-overlay"><span class="puo-icon">📷</span><span class="puo-text">تغيير الصورة</span></div>
+            </div>
             <div class="podium-medal">${medals[rank]}</div>
           </div>
           <div class="podium-name">${st.name}</div>
@@ -3710,7 +3754,10 @@ function renderHof() {
       const photoHTML=st.photoData?`<img src="${st.photoData}" alt="${st.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:st.avatar;
       restHTML+=`
         <div class="hof-rest-card" style="animation-delay:${i*0.08}s">
-          <div class="hof-rest-photo">${photoHTML}</div>
+          <div class="hof-rest-photo photo-upload-wrap" onclick="triggerPhotoUpload(${st.id})" title="انقر لتغيير الصورة">
+            ${photoHTML}
+            <div class="photo-upload-overlay"><span class="puo-icon">📷</span><span class="puo-text">تغيير</span></div>
+          </div>
           <div class="hof-rest-info">
             <div class="hof-rest-name">${st.name}</div>
             <div class="hof-rest-rank-badge">${HOF_TITLES[st.stars]||'متعلم'}</div>
@@ -4055,7 +4102,15 @@ function renderManage(){
   ROSTER.forEach((st,i)=>{
     const card=document.createElement('div'); card.className='manage-card'; card.setAttribute('data-student-id',st.id);
     const rankIcon=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-    const photoEl=st.photoData?`<img src="${st.photoData}" class="manage-card-photo" alt="${st.name}">`:`<div class="manage-card-photo-placeholder">${st.avatar}</div>`;
+    const photoEl = st.photoData
+      ? `<div class="photo-upload-wrap" onclick="triggerPhotoUpload(${st.id})" title="انقر لتغيير الصورة">
+           <img src="${st.photoData}" class="manage-card-photo" alt="${st.name}">
+           <div class="photo-upload-overlay"><span class="puo-icon">📷</span><span class="puo-text">تغيير</span></div>
+         </div>`
+      : `<div class="manage-card-photo-placeholder photo-upload-wrap" onclick="triggerPhotoUpload(${st.id})" title="انقر لتغيير الصورة">
+           ${st.avatar}
+           <div class="photo-upload-overlay"><span class="puo-icon">📷</span><span class="puo-text">رفع صورة</span></div>
+         </div>`;
 
     // Stars editor inline
     let starsEditorHTML='';
@@ -4081,6 +4136,24 @@ function renderManage(){
 }
 
 function deleteStudentManage(id){ rosterDel(id); renderManage(); renderStudents(); renderHof(); }
+
+function triggerPhotoUpload(id) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const st = ROSTER.find(x => x.id === id); if (!st) return;
+      st.photoData = ev.target.result;
+      scheduleSave();
+      renderManage(); renderHof(); renderStudents();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
 
 function openManage(){
   renderManage();
