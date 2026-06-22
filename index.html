@@ -3569,17 +3569,14 @@ function setStar(val) {
   document.querySelectorAll('.star-btn').forEach((b,i)=>b.classList.toggle('active',i<val));
 }
 
-function previewManagePhoto(input) {
+async function previewManagePhoto(input) {
   const file = input.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    pendingPhoto = e.target.result;
-    const thumb = document.getElementById('managePhotoThumb');
-    const prev  = document.getElementById('managePhotoPreview');
-    if(thumb) thumb.src = pendingPhoto;
-    if(prev)  prev.style.display = 'flex';
-  };
-  reader.readAsDataURL(file);
+  pendingPhoto = await compressFile(file);
+  if (!pendingPhoto) return;
+  const thumb = document.getElementById('managePhotoThumb');
+  const prev  = document.getElementById('managePhotoPreview');
+  if(thumb) thumb.src = pendingPhoto;
+  if(prev)  prev.style.display = 'flex';
 }
 
 function clearManagePhoto() {
@@ -3673,15 +3670,12 @@ function setHofStar(val) {
   document.querySelectorAll('.hof-star-btn').forEach((b,i)=>b.classList.toggle('active',i<val));
 }
 
-function previewHofPhoto(input) {
+async function previewHofPhoto(input) {
   const file=input.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    hofPendingPhoto=e.target.result;
-    document.getElementById('hofPhotoThumb').src=hofPendingPhoto;
-    document.getElementById('hofPhotoPreview').style.display='flex';
-  };
-  reader.readAsDataURL(file);
+  hofPendingPhoto = await compressFile(file);
+  if (!hofPendingPhoto) return;
+  document.getElementById('hofPhotoThumb').src=hofPendingPhoto;
+  document.getElementById('hofPhotoPreview').style.display='flex';
 }
 
 function clearHofPhoto() {
@@ -4085,15 +4079,12 @@ function setManageStar(val){
   document.querySelectorAll('.manage-star-btn').forEach((b,i)=>b.classList.toggle('active',i<val));
 }
 
-function previewManageScreenPhoto(input){
+async function previewManageScreenPhoto(input){
   const file=input.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    managePendingPhoto=e.target.result;
-    document.getElementById('manageScreenPhotoThumb').src=managePendingPhoto;
-    document.getElementById('manageScreenPhotoPreview').style.display='flex';
-  };
-  reader.readAsDataURL(file);
+  managePendingPhoto = await compressFile(file);
+  if (!managePendingPhoto) return;
+  document.getElementById('manageScreenPhotoThumb').src=managePendingPhoto;
+  document.getElementById('manageScreenPhotoPreview').style.display='flex';
 }
 
 function clearManageScreenPhoto(){
@@ -4158,26 +4149,77 @@ function renderManage(){
 
 function deleteStudentManage(id){ rosterDel(id); renderManage(); renderStudents(); renderHof(); }
 
+// ── Image compression helpers ──────────────────────────────────────
+// Max dimension for stored photos (keeps base64 well under GitHub's 1 MB limit)
+const PHOTO_MAX_DIM = 200;
+const PHOTO_QUALITY = 0.78;
+
+function _compressImgEl(imgEl) {
+  let w = imgEl.naturalWidth, h = imgEl.naturalHeight;
+  if (w > PHOTO_MAX_DIM || h > PHOTO_MAX_DIM) {
+    if (w >= h) { h = Math.round(h * PHOTO_MAX_DIM / w); w = PHOTO_MAX_DIM; }
+    else        { w = Math.round(w * PHOTO_MAX_DIM / h); h = PHOTO_MAX_DIM; }
+  }
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(imgEl, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', PHOTO_QUALITY);
+}
+
+function compressFile(file) {
+  return new Promise(function(resolve) {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload  = function() { URL.revokeObjectURL(url); resolve(_compressImgEl(img)); };
+    img.onerror = function() { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+function compressDataUrl(dataUrl) {
+  return new Promise(function(resolve) {
+    const img = new Image();
+    img.onload  = function() { resolve(_compressImgEl(img)); };
+    img.onerror = function() { resolve(null); };
+    img.src = dataUrl;
+  });
+}
+
+// Compress any existing oversized photos already in ROSTER (one-time migration)
+async function compressRosterPhotos() {
+  const LIMIT = 30000; // ~22 KB base64 → already fits; skip if smaller
+  let changed = false;
+  for (const st of ROSTER) {
+    if (st.photoData && st.photoData.length > LIMIT) {
+      const small = await compressDataUrl(st.photoData);
+      if (small && small.length < st.photoData.length) {
+        st.photoData = small;
+        changed = true;
+      }
+    }
+  }
+  if (changed) await persistData();
+}
+// ───────────────────────────────────────────────────────────────────
+
 function triggerPhotoUpload(id) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.onchange = function(e) {
+  input.onchange = async function(e) {
     const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(ev) {
-      const st = ROSTER.find(x => x.id === id); if (!st) return;
-      st.photoData = ev.target.result;
-      renderManage(); renderHof(); renderStudents();
-      setPhotoLoader(id, true);
-      clearTimeout(saveTimer);
-      try {
-        await persistData();
-      } finally {
-        setPhotoLoader(id, false);
-      }
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressFile(file);
+    if (!compressed) return;
+    const st = ROSTER.find(x => x.id === id); if (!st) return;
+    st.photoData = compressed;
+    renderManage(); renderHof(); renderStudents();
+    setPhotoLoader(id, true);
+    clearTimeout(saveTimer);
+    try {
+      await persistData();
+    } finally {
+      setPhotoLoader(id, false);
+    }
   };
   input.click();
 }
@@ -4211,6 +4253,7 @@ function closeManage(){
 // ═══════════════════════════════════════════════════════════
 async function initApp() {
   await loadAllData();
+  await compressRosterPhotos();
   buildStars();
   renderStudents();
   startCloudPolling();
