@@ -6,12 +6,19 @@
       "stars": 1,
       "photoData": null,
       "avatar": "🦁"
+    },
+    {
+      "id": 2,
+      "name": "cvf",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "👧"
     }
   ],
-  "rosterNextId": 2,
+  "rosterNextId": 3,
   "keysCollected": 0,
   "completedStations": [],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782168124285
+  "updatedAt": 1782170089609
 }
