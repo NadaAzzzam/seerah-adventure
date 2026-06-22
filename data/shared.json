@@ -6,9 +6,16 @@
       "stars": 1,
       "photoData": null,
       "avatar": "👧"
+    },
+    {
+      "id": 4,
+      "name": "kj",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "🧑"
     }
   ],
-  "rosterNextId": 4,
+  "rosterNextId": 5,
   "keysCollected": 5,
   "completedStations": [
     0,
@@ -19,5 +26,5 @@
   ],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782172285717
+  "updatedAt": 1782172287773
 }
