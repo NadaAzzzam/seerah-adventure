@@ -2249,6 +2249,27 @@
   }
   .hof-rest-photo { position: relative; }
 
+  /* Photo saving loader */
+  @keyframes photoSpin { to { transform: rotate(360deg); } }
+  .photo-saving .photo-upload-overlay {
+    opacity: 1 !important;
+    pointer-events: none;
+    background: rgba(8, 4, 24, 0.88);
+    cursor: default;
+  }
+  .photo-saving .puo-icon {
+    font-size: 0;
+    width: 1.15rem;
+    height: 1.15rem;
+    border: 2.5px solid rgba(255,255,255,0.22);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: photoSpin 0.75s linear infinite;
+    display: block;
+    flex-shrink: 0;
+  }
+  .photo-saving .puo-text { font-size: 0.55rem; opacity: 0.9; }
+
   .manage-stars-row { display:flex; gap:4px; align-items:center; background:var(--bg-card); border:2px solid var(--border-gold); border-radius:14px; padding:7px 12px; }
   .manage-star-btn { font-size:1.4rem; cursor:pointer; opacity:0.3; border:none; background:none; padding:2px; transition:opacity 0.15s,transform 0.15s; }
   .manage-star-btn.active { opacity:1; transform:scale(1.15); }
@@ -4144,15 +4165,35 @@ function triggerPhotoUpload(id) {
   input.onchange = function(e) {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(ev) {
+    reader.onload = async function(ev) {
       const st = ROSTER.find(x => x.id === id); if (!st) return;
       st.photoData = ev.target.result;
-      scheduleSave();
       renderManage(); renderHof(); renderStudents();
+      setPhotoLoader(id, true);
+      clearTimeout(saveTimer);
+      try {
+        await persistData();
+      } finally {
+        setPhotoLoader(id, false);
+      }
     };
     reader.readAsDataURL(file);
   };
   input.click();
+}
+
+function setPhotoLoader(id, loading) {
+  document.querySelectorAll('[onclick="triggerPhotoUpload(' + id + ')"]').forEach(function(wrap) {
+    if (loading) {
+      wrap.classList.add('photo-saving');
+      const txt = wrap.querySelector('.puo-text');
+      if (txt) txt.textContent = 'جاري الحفظ...';
+    } else {
+      wrap.classList.remove('photo-saving');
+      const txt = wrap.querySelector('.puo-text');
+      if (txt) txt.textContent = 'تغيير';
+    }
+  });
 }
 
 function openManage(){
