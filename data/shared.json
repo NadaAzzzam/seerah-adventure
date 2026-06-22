@@ -1,14 +1,15 @@
 {
   "roster": [],
   "rosterNextId": 3,
-  "keysCollected": 1,
+  "keysCollected": 2,
   "completedStations": [
-    0
+    0,
+    1
   ],
   "isDark": true,
   "drawNames": [
     "jk]",
     ","
   ],
-  "updatedAt": 1782172019553
+  "updatedAt": 1782172022578
 }
