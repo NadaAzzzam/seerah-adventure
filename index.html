@@ -3599,16 +3599,16 @@ function addStudent() {
   rosterAdd(name, selectedStars, pendingPhoto);
   document.getElementById('studentNameInput').value='';
   clearManagePhoto(); setStar(1);
-  renderStudents(); renderHof();
+  refreshAllUi();
 }
 
-function deleteStudent(id) { rosterDel(id); renderStudents(); renderHof(); }
+function deleteStudent(id) { rosterDel(id); refreshAllUi(); }
 
 function adjustStarManage(id, delta) {
   const s = ROSTER.find(x=>x.id===id);
   if(!s) return;
   rosterSet(id, s.stars+delta);
-  renderStudents(); renderHof();
+  refreshAllUi();
 }
 
 function renderStudents() {
@@ -3695,16 +3695,16 @@ function addHofStudent() {
   rosterAdd(name, hofSelectedStars, hofPendingPhoto);
   document.getElementById('hofNameInput').value='';
   clearHofPhoto(); setHofStar(1);
-  renderHof(); renderStudents();
+  refreshAllUi();
 }
 
 function adjustStarHof(id, delta) {
   const s=ROSTER.find(x=>x.id===id); if(!s) return;
   rosterSet(id, s.stars+delta);
-  renderHof(); renderStudents();
+  refreshAllUi();
 }
 
-function deleteHofStudent(id) { rosterDel(id); hofEditMode=false; renderHof(); renderStudents(); }
+function deleteHofStudent(id) { rosterDel(id); hofEditMode=false; refreshAllUi(); }
 
 function renderHof() {
   const area=document.getElementById('hofStageArea');
@@ -4051,7 +4051,7 @@ function handleDrawAddWinner(){
   } else {
     // Add with 1 star and open manage to let teacher pick stars
     rosterAdd(drawWinner, 1, null);
-    renderStudents(); renderHof();
+    refreshAllUi();
     closeDrawOpenManage(null);
   }
 }
@@ -4101,7 +4101,7 @@ function addManageScreenStudent(){
   rosterAdd(name, manageSelectedStars, managePendingPhoto);
   document.getElementById('manageScreenNameInput').value='';
   clearManageScreenPhoto(); setManageStar(1);
-  renderManage(); renderStudents(); renderHof();
+  refreshAllUi();
 }
 
 function renderManage(){
@@ -4147,7 +4147,7 @@ function renderManage(){
   });
 }
 
-function deleteStudentManage(id){ rosterDel(id); renderManage(); renderStudents(); renderHof(); }
+function deleteStudentManage(id){ rosterDel(id); refreshAllUi(); }
 
 // ── Image compression helpers ──────────────────────────────────────
 // Max dimension for stored photos (keeps base64 well under GitHub's 1 MB limit)
@@ -4212,7 +4212,7 @@ function triggerPhotoUpload(id) {
     if (!compressed) return;
     const st = ROSTER.find(x => x.id === id); if (!st) return;
     st.photoData = compressed;
-    renderManage(); renderHof(); renderStudents();
+    refreshAllUi();
     setPhotoLoader(id, true);
     clearTimeout(saveTimer);
     try {
