@@ -401,6 +401,40 @@
   }
   .leaderboard-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 30px rgba(139,92,246,0.6); }
 
+  .reset-data-btn {
+    background: linear-gradient(135deg, #EF4444, #B91C1C);
+    border: none;
+    border-radius: 50px;
+    padding: 10px 22px;
+    color: white;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 4px 20px rgba(239,68,68,0.35);
+  }
+  .reset-data-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 30px rgba(239,68,68,0.55); }
+
+  .reset-confirm-card {
+    max-width: 460px;
+    padding: 30px;
+    text-align: center;
+  }
+  .reset-confirm-icon { display:block; font-size:3.4rem; margin-bottom:10px; }
+  .reset-confirm-title { color:var(--text-primary); font-size:1.55rem; font-weight:900; margin-bottom:10px; }
+  .reset-confirm-text { color:var(--text-secondary); line-height:1.9; font-weight:600; }
+  .reset-confirm-actions { display:flex; gap:10px; justify-content:center; margin-top:24px; }
+  .reset-confirm-actions button {
+    border:none; border-radius:14px; padding:11px 22px; color:white; cursor:pointer;
+    font-family:'Cairo',sans-serif; font-size:0.95rem; font-weight:800;
+    transition:transform 0.2s, opacity 0.2s;
+  }
+  .reset-confirm-actions button:hover:not(:disabled) { transform:translateY(-2px); }
+  .reset-confirm-actions button:disabled { cursor:wait; opacity:0.65; }
+  .reset-confirm-cancel { background:linear-gradient(135deg,#64748B,#475569); }
+  .reset-confirm-submit { background:linear-gradient(135deg,#EF4444,#B91C1C); box-shadow:0 4px 18px rgba(239,68,68,0.35); }
+
   /* ───── MAP CANVAS ───── */
   .map-world {
     flex: 1;
@@ -2399,6 +2433,7 @@
       <button class="hof-open-btn" onclick="openHof()">🏆 فرسان السيرة</button>
       <button class="leaderboard-btn" onclick="openDraw()">🎯 قرعة</button>
       <button class="leaderboard-btn" onclick="openManage()" style="background:linear-gradient(135deg,#10B981,#059669)">📋 الإدارة</button>
+      <button class="reset-data-btn" onclick="openResetConfirmation()">🗑️ مسح البيانات</button>
     </div>
   </div>
 
@@ -2470,6 +2505,19 @@
     </div>
 
     <button class="btn-restart" onclick="restartGame()">🔄 العب مرة أخرى</button>
+  </div>
+</div>
+
+<!-- ░░░░░ RESET DATA CONFIRMATION ░░░░░ -->
+<div class="modal-overlay" id="resetDataModal" role="dialog" aria-modal="true" aria-labelledby="resetDataTitle" onclick="handleResetBackdrop(event)">
+  <div class="modal-card reset-confirm-card">
+    <span class="reset-confirm-icon">🗑️</span>
+    <h3 class="reset-confirm-title" id="resetDataTitle">مسح جميع البيانات؟</h3>
+    <p class="reset-confirm-text">سيتم حذف الطلاب والنجوم وأسماء القرعة وتقدّم الرحلة من هذا الجهاز ومن قاعدة البيانات المشتركة. لا يمكن التراجع عن هذا الإجراء.</p>
+    <div class="reset-confirm-actions">
+      <button class="reset-confirm-cancel" type="button" onclick="closeResetConfirmation()">إلغاء</button>
+      <button class="reset-confirm-submit" id="confirmResetButton" type="button" onclick="resetAllData()">نعم، امسح البيانات</button>
+    </div>
   </div>
 </div>
 
@@ -2917,6 +2965,14 @@ async function saveToApi(state) {
   if (typeof result.updatedAt === 'number') lastAppliedUpdatedAt = result.updatedAt;
 }
 
+async function resetApiData() {
+  const { apiUrl } = window.SEERAH_CONFIG || {};
+  const res = await fetch(apiUrl, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+  const result = await res.json();
+  if (typeof result.updatedAt === 'number') lastAppliedUpdatedAt = result.updatedAt;
+}
+
 async function loadFromSupabase() {
   const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
   const res = await fetch(
@@ -2956,6 +3012,82 @@ async function saveToCloud(state) {
   const c = window.SEERAH_CONFIG || {};
   if (c.apiUrl) return saveToApi(state);
   if (c.supabaseUrl && c.supabaseAnonKey) return saveToSupabase(state);
+}
+
+async function resetCloudData(state) {
+  const c = window.SEERAH_CONFIG || {};
+  if (c.apiUrl) return resetApiData();
+  if (c.supabaseUrl && c.supabaseAnonKey) return saveToSupabase(state);
+}
+
+function getEmptyAppState() {
+  return {
+    roster: [],
+    rosterNextId: 1,
+    keysCollected: 0,
+    completedStations: [],
+    isDark,
+    drawNames: [],
+    updatedAt: Date.now()
+  };
+}
+
+function openResetConfirmation() {
+  document.getElementById('resetDataModal').classList.add('open');
+}
+
+function closeResetConfirmation() {
+  if (document.getElementById('confirmResetButton')?.disabled) return;
+  document.getElementById('resetDataModal').classList.remove('open');
+}
+
+function handleResetBackdrop(event) {
+  if (event.target.id === 'resetDataModal') closeResetConfirmation();
+}
+
+async function waitForActiveSave() {
+  while (isSaving) await new Promise(resolve => setTimeout(resolve, 100));
+}
+
+async function resetAllData() {
+  const button = document.getElementById('confirmResetButton');
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳ جاري المسح...';
+  clearTimeout(saveTimer);
+
+  try {
+    await waitForActiveSave();
+    const emptyState = getEmptyAppState();
+    if (hasCloudSync()) {
+      isSaving = true;
+      await resetCloudData(emptyState);
+    }
+
+    localStorage.removeItem(LS_DATA_KEY);
+    applyAppState(emptyState);
+    currentStation = null;
+    answered = false;
+    teacherProgress = 0;
+    closeResetConfirmationAfterSuccess();
+    showScreen('screen-welcome');
+    updateSyncStatus(hasCloudSync() ? '☁️ تم مسح جميع البيانات' : '✅ تم مسح البيانات المحلية');
+  } catch (error) {
+    console.error('Data reset failed', error);
+    updateSyncStatus('⚠️ تعذّر مسح البيانات');
+    button.disabled = false;
+    button.textContent = 'تعذّر المسح — حاول مرة أخرى';
+    setTimeout(() => { button.textContent = originalText; }, 2200);
+  } finally {
+    isSaving = false;
+  }
+}
+
+function closeResetConfirmationAfterSuccess() {
+  const button = document.getElementById('confirmResetButton');
+  document.getElementById('resetDataModal').classList.remove('open');
+  button.disabled = false;
+  button.textContent = 'نعم، امسح البيانات';
 }
 
 async function persistData() {

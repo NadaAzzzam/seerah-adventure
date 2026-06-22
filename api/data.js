@@ -10,7 +10,7 @@ const EMPTY = {
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
@@ -52,8 +52,10 @@ export default async function handler(req, res) {
       return res.status(200).json(JSON.parse(text));
     }
 
-    if (req.method === 'PUT') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if (req.method === 'PUT' || req.method === 'DELETE') {
+      const body = req.method === 'DELETE'
+        ? EMPTY
+        : (typeof req.body === 'string' ? JSON.parse(req.body) : req.body);
       const payload = {
         ...EMPTY,
         ...body,
@@ -62,7 +64,9 @@ export default async function handler(req, res) {
 
       const existing = await github(repoPath());
       const requestBody = {
-        message: 'Update shared classroom data',
+        message: req.method === 'DELETE'
+          ? 'Reset shared classroom data'
+          : 'Update shared classroom data',
         content: Buffer.from(JSON.stringify(payload, null, 2), 'utf8').toString('base64')
       };
       if (existing?.sha) requestBody.sha = existing.sha;
