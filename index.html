@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🗺️ رحلة كنز السيرة النبوية</title>
+<script src="config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   /* ══════════════════════════════════════
@@ -2167,6 +2168,24 @@
   .manage-back-btn { background:rgba(255,255,255,0.08); border:1.5px solid rgba(255,255,255,0.18); border-radius:40px; padding:10px 20px; color:var(--text-secondary,#C7D2FE); font-family:Cairo,sans-serif; font-weight:700; font-size:0.95rem; cursor:pointer; transition:background 0.2s; }
   .manage-back-btn:hover { background:rgba(255,255,255,0.14); }
   html.light .manage-back-btn { color:var(--text-secondary); border-color:rgba(180,100,10,0.25); }
+
+  .sync-panel {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+    margin-bottom: 18px; padding: 12px 14px; border-radius: 16px;
+    background: var(--bg-card); border: 1px solid var(--border-card);
+  }
+  .sync-panel label { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; }
+  .sync-code-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sync-code-input {
+    min-width: 140px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--border-input);
+    background: var(--bg-input); color: var(--text-primary); font-family: Cairo, sans-serif;
+  }
+  .sync-code-btn {
+    padding: 8px 14px; border-radius: 12px; border: 1px solid var(--border-gold);
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark)); color: #1a1200;
+    font-family: Cairo, sans-serif; font-weight: 800; cursor: pointer;
+  }
+  #syncStatus { font-size: 0.82rem; color: var(--text-muted); font-weight: 700; }
   .manage-title    { font-size:clamp(1.4rem,4vw,2.2rem); font-weight:900; background:linear-gradient(135deg,#FFD166,#F5A623); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin:0; }
   .manage-subtitle { color:var(--text-muted,#A5B4FC); font-size:0.9rem; font-weight:600; margin:3px 0 0; }
   .manage-hof-btn  { background:linear-gradient(135deg,#F5A623,#D97706); border:none; border-radius:40px; padding:10px 20px; color:#1E1B4B; font-family:Cairo,sans-serif; font-weight:800; font-size:0.9rem; cursor:pointer; transition:transform 0.2s; white-space:nowrap; }
@@ -2524,6 +2543,17 @@
       <button class="manage-hof-btn" onclick="openHof()">🏆 عرض الشاشة</button>
     </div>
 
+    <div class="sync-panel">
+      <div>
+        <label for="classCodeInput">رمز الفصل (للمزامنة بين الأجهزة)</label>
+        <div class="sync-code-row" style="margin-top:6px">
+          <input class="sync-code-input" id="classCodeInput" type="text" placeholder="مثال: faseh-2025" maxlength="40">
+          <button class="sync-code-btn" type="button" onclick="saveClassCode()">حفظ الرمز</button>
+        </div>
+      </div>
+      <div id="syncStatus">💾 محفوظ على هذا الجهاز</div>
+    </div>
+
     <!-- Add form -->
     <div class="manage-add-panel">
       <input class="manage-input" id="manageScreenNameInput" type="text" placeholder="✏️ اسم الطالب..." maxlength="30">
@@ -2720,6 +2750,7 @@ let keysCollected = 0;
 let completedStations = new Set();
 let currentStation = null;
 let answered = false;
+let drawNames = [];
 
 // ═══ UNIFIED ROSTER — shared between Manage panel, HOF, and Draw ═══
 // Each student: { id, name, stars, photoData, avatar }
@@ -2727,18 +2758,170 @@ let ROSTER = [];
 let rosterNextId = 1;
 function rosterAdd(name, stars, photoData) {
   const existing = ROSTER.find(s => s.name.trim() === name.trim());
-  if (existing) { existing.stars = Math.min(5, existing.stars + stars); return existing; }
+  if (existing) { existing.stars = Math.min(5, existing.stars + stars); scheduleSave(); return existing; }
   const s = { id: rosterNextId++, name: name.trim(), stars: Math.min(5,stars), photoData: photoData||null, avatar: ROSTER_AVATARS[Math.floor(Math.random()*ROSTER_AVATARS.length)] };
   ROSTER.push(s);
   ROSTER.sort((a,b)=>b.stars-a.stars);
+  scheduleSave();
   return s;
 }
 function rosterSet(id, stars) {
   const s = ROSTER.find(x=>x.id===id);
-  if (s) { s.stars = Math.max(1,Math.min(5,stars)); ROSTER.sort((a,b)=>b.stars-a.stars); }
+  if (s) { s.stars = Math.max(1,Math.min(5,stars)); ROSTER.sort((a,b)=>b.stars-a.stars); scheduleSave(); }
 }
-function rosterDel(id) { ROSTER = ROSTER.filter(x=>x.id!==id); }
+function rosterDel(id) { ROSTER = ROSTER.filter(x=>x.id!==id); scheduleSave(); }
 const ROSTER_AVATARS = ['🧒','👦','👧','🧑','👩','🧕','🧑‍🎓','🌟','🏅','🦁','🦅'];
+
+// ═══════════════════════════════════════════════════════════
+//  DATA PERSISTENCE (local + optional Supabase)
+// ═══════════════════════════════════════════════════════════
+const LS_DATA_KEY = 'seerah_saved_data';
+const LS_CLASS_KEY = 'seerah_class_code';
+let classCode = localStorage.getItem(LS_CLASS_KEY) || 'default';
+let saveTimer = null;
+
+function hasCloudSync() {
+  const c = window.SEERAH_CONFIG;
+  return !!(c && c.supabaseUrl && c.supabaseAnonKey);
+}
+
+function getAppState() {
+  return {
+    roster: ROSTER,
+    rosterNextId,
+    keysCollected,
+    completedStations: [...completedStations],
+    isDark,
+    drawNames
+  };
+}
+
+function applyAppState(state) {
+  if (!state || typeof state !== 'object') return;
+  if (Array.isArray(state.roster)) ROSTER = state.roster;
+  if (typeof state.rosterNextId === 'number') rosterNextId = state.rosterNextId;
+  keysCollected = state.keysCollected || 0;
+  completedStations = new Set(Array.isArray(state.completedStations) ? state.completedStations : []);
+  if (typeof state.isDark === 'boolean') isDark = state.isDark;
+  if (Array.isArray(state.drawNames)) drawNames = state.drawNames;
+  updateKeys();
+  applyThemeFromState();
+}
+
+function applyThemeFromState() {
+  const html = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  if (isDark) {
+    html.classList.remove('light');
+    btn.textContent = '☀️';
+    btn.setAttribute('data-tip', 'الوضع النهاري');
+  } else {
+    html.classList.add('light');
+    btn.textContent = '🌙';
+    btn.setAttribute('data-tip', 'الوضع الليلي');
+  }
+}
+
+function updateSyncStatus(text) {
+  const el = document.getElementById('syncStatus');
+  if (el) el.textContent = text;
+}
+
+function saveLocal(state) {
+  try { localStorage.setItem(LS_DATA_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LS_DATA_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+async function loadFromSupabase(code) {
+  const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/seerah_classrooms?code=eq.${encodeURIComponent(code)}&select=data`,
+    { headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` } }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return rows[0]?.data ?? null;
+}
+
+async function saveToSupabase(code, state) {
+  const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
+  const res = await fetch(`${supabaseUrl}/rest/v1/seerah_classrooms`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      Prefer: 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify({ code, data: state, updated_at: new Date().toISOString() })
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function persistData() {
+  const state = getAppState();
+  saveLocal(state);
+  if (!hasCloudSync()) {
+    updateSyncStatus('💾 محفوظ على هذا الجهاز');
+    return;
+  }
+  updateSyncStatus('⏳ جاري الحفظ...');
+  try {
+    await saveToSupabase(classCode, state);
+    updateSyncStatus('☁️ محفوظ في السحابة');
+  } catch (e) {
+    console.error(e);
+    updateSyncStatus('⚠️ محفوظ محلياً فقط');
+  }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persistData, 600);
+}
+
+async function loadAllData() {
+  const input = document.getElementById('classCodeInput');
+  if (input) input.value = classCode;
+
+  if (hasCloudSync()) {
+    updateSyncStatus('⏳ جاري التحميل...');
+    try {
+      const cloud = await loadFromSupabase(classCode);
+      if (cloud) {
+        applyAppState(cloud);
+        saveLocal(cloud);
+        updateSyncStatus('☁️ تم التحميل من السحابة');
+        return;
+      }
+    } catch (e) {
+      console.warn('Cloud load failed', e);
+    }
+  }
+
+  applyAppState(loadLocal());
+  updateSyncStatus('💾 محفوظ على هذا الجهاز');
+}
+
+function saveClassCode() {
+  const input = document.getElementById('classCodeInput');
+  const code = (input?.value || '').trim() || 'default';
+  classCode = code;
+  localStorage.setItem(LS_CLASS_KEY, code);
+  loadAllData().then(() => {
+    renderStudents();
+    renderHof();
+    renderManage();
+    if (document.getElementById('screen-map').classList.contains('active')) buildStations();
+  });
+}
 
 // ═══════════════════════════════════════════════════════════
 //  THEME TOGGLE
@@ -2764,6 +2947,7 @@ function toggleTheme() {
   const bg = document.getElementById('starsBg');
   bg.innerHTML = '';
   buildStars();
+  scheduleSave();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3084,6 +3268,7 @@ function restartGame() {
   document.getElementById('keyCount').textContent = '0';
   document.getElementById('progressFill').style.width = '0%';
   showScreen('screen-welcome');
+  scheduleSave();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3164,6 +3349,7 @@ function answerQuestion(isCorrect, btn) {
     keysCollected++;
     updateKeys();
     buildStations();
+    scheduleSave();
     launchConfetti();
     showKeyAnimation();
 
@@ -3545,7 +3731,6 @@ function pulseHofBtn(){
 // ══════════════════════════════════════════════════════════════════
 //  LUCKY DRAW SCREEN
 // ══════════════════════════════════════════════════════════════════
-let drawNames = [];        // names entered for this draw session
 let drawSpinning = false;
 let drawWinner = null;
 let drawSpinInterval = null;
@@ -3582,19 +3767,19 @@ function addDrawName() {
   const inp = document.getElementById('drawNameInput');
   const name = inp.value.trim(); if(!name) return;
   if(!drawNames.includes(name)) drawNames.push(name);
-  inp.value=''; renderDrawNames();
+  inp.value=''; renderDrawNames(); scheduleSave();
 }
 
 function removeDrawName(i) {
-  drawNames.splice(i,1); renderDrawNames();
+  drawNames.splice(i,1); renderDrawNames(); scheduleSave();
 }
 
 function addAllFromRoster() {
   ROSTER.forEach(s=>{ if(!drawNames.includes(s.name)) drawNames.push(s.name); });
-  renderDrawNames();
+  renderDrawNames(); scheduleSave();
 }
 
-function clearDraw() { drawNames=[]; renderDrawNames(); }
+function clearDraw() { drawNames=[]; renderDrawNames(); scheduleSave(); }
 
 // ─── Wheel drawing ──────────────────────────────────────────
 const WHEEL_COLORS = [
@@ -3855,8 +4040,13 @@ function closeManage(){
 // ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
-buildStars();
-renderStudents();
+async function initApp() {
+  await loadAllData();
+  buildStars();
+  renderStudents();
+}
+
+initApp();
 
 // Redraw teacher on resize (SVG bounds change)
 window.addEventListener('resize', () => {
