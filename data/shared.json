@@ -17,7 +17,7 @@
     {
       "id": 3,
       "name": "فاطمه",
-      "stars": 1,
+      "stars": 2,
       "photoData": null,
       "avatar": "👦"
     }
@@ -33,5 +33,5 @@
     "vf",
     "dscx"
   ],
-  "updatedAt": 1782216172238
+  "updatedAt": 1782216176432
 }
