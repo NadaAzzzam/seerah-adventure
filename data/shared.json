@@ -9,11 +9,12 @@
     }
   ],
   "rosterNextId": 2,
-  "keysCollected": 1,
+  "keysCollected": 2,
   "completedStations": [
-    0
+    0,
+    1
   ],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782201100996
+  "updatedAt": 1782201117521
 }
