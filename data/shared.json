@@ -13,9 +13,16 @@
       "stars": 1,
       "photoData": null,
       "avatar": "🧑"
+    },
+    {
+      "id": 3,
+      "name": "فاطمه",
+      "stars": 1,
+      "photoData": null,
+      "avatar": "👦"
     }
   ],
-  "rosterNextId": 3,
+  "rosterNextId": 4,
   "keysCollected": 1,
   "completedStations": [
     0
@@ -26,5 +33,5 @@
     "vf",
     "dscx"
   ],
-  "updatedAt": 1782216157889
+  "updatedAt": 1782216166914
 }
