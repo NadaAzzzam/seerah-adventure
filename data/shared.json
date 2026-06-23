@@ -16,16 +16,17 @@
     }
   ],
   "rosterNextId": 4,
-  "keysCollected": 3,
+  "keysCollected": 4,
   "completedStations": [
     0,
     1,
-    2
+    2,
+    3
   ],
   "isDark": true,
   "drawNames": [
     "الهام",
     "ندى"
   ],
-  "updatedAt": 1782202502977
+  "updatedAt": 1782202524174
 }
