@@ -13,10 +13,10 @@
   "completedStations": [
     0
   ],
-  "isDark": false,
+  "isDark": true,
   "drawNames": [
     "الهام",
     "l"
   ],
-  "updatedAt": 1782201340080
+  "updatedAt": 1782201344751
 }
