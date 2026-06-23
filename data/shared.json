@@ -3,15 +3,17 @@
     {
       "id": 1,
       "name": "l",
-      "stars": 2,
+      "stars": 3,
       "photoData": null,
       "avatar": "🦁"
     }
   ],
   "rosterNextId": 2,
-  "keysCollected": 0,
-  "completedStations": [],
+  "keysCollected": 1,
+  "completedStations": [
+    0
+  ],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782200970455
+  "updatedAt": 1782201100996
 }
