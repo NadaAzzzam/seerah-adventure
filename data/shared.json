@@ -11,7 +11,7 @@
   "rosterNextId": 2,
   "keysCollected": 0,
   "completedStations": [],
-  "isDark": true,
+  "isDark": false,
   "drawNames": [],
-  "updatedAt": 1782201169716
+  "updatedAt": 1782201174588
 }
