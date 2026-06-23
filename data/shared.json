@@ -3,7 +3,7 @@
     {
       "id": 1,
       "name": "l",
-      "stars": 1,
+      "stars": 2,
       "photoData": null,
       "avatar": "🦁"
     }
@@ -13,5 +13,5 @@
   "completedStations": [],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782200965963
+  "updatedAt": 1782200970455
 }
