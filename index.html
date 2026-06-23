@@ -2965,14 +2965,6 @@ async function saveToApi(state) {
   if (typeof result.updatedAt === 'number') lastAppliedUpdatedAt = result.updatedAt;
 }
 
-async function resetApiData() {
-  const { apiUrl } = window.SEERAH_CONFIG || {};
-  const res = await fetch(apiUrl, { method: 'DELETE' });
-  if (!res.ok) throw new Error(await res.text());
-  const result = await res.json();
-  if (typeof result.updatedAt === 'number') lastAppliedUpdatedAt = result.updatedAt;
-}
-
 async function loadFromSupabase() {
   const { supabaseUrl, supabaseAnonKey } = window.SEERAH_CONFIG;
   const res = await fetch(
@@ -3016,7 +3008,8 @@ async function saveToCloud(state) {
 
 async function resetCloudData(state) {
   const c = window.SEERAH_CONFIG || {};
-  if (c.apiUrl) return resetApiData();
+  // Use the existing PUT endpoint so reset also works with older deployments.
+  if (c.apiUrl) return saveToApi(state);
   if (c.supabaseUrl && c.supabaseAnonKey) return saveToSupabase(state);
 }
 
