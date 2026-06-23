@@ -16,9 +16,11 @@
     }
   ],
   "rosterNextId": 3,
-  "keysCollected": 0,
-  "completedStations": [],
+  "keysCollected": 1,
+  "completedStations": [
+    0
+  ],
   "isDark": true,
   "drawNames": [],
-  "updatedAt": 1782201236636
+  "updatedAt": 1782201260268
 }
